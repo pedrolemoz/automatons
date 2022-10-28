@@ -14,61 +14,65 @@ class EpsilonNFA extends EpsilonNonDeterministicAutomaton {
 
   static thompsonConstruction(String regularExpression) {
     final symbols = _parseRegularExpression(regularExpression, []);
-
-    int stateCounter = 0;
-
-    List<EpsilonNFA> eNFAs = [];
-
-    for (var element in symbols) {
-      if (element is Epsilon) {
-        final firstState = 'q$stateCounter';
-        final lastState = 'q${stateCounter + 1}';
-
-        stateCounter += 2;
-
-        final eNFA = EpsilonNFA(
-          states: [firstState, lastState],
-          initialState: firstState,
-          alphabet: [],
-          transitions: {
-            firstState: {
-              epsilon: [lastState]
-            },
-            lastState: {}
-          },
-          finalStates: [lastState],
-        );
-
-        eNFAs.add(eNFA);
-        continue;
-      }
-
-      if (element is Literal) {
-        final firstState = 'q$stateCounter';
-        final lastState = 'q${stateCounter + 1}';
-
-        stateCounter += 2;
-
-        final eNFA = EpsilonNFA(
-          states: [firstState, lastState],
-          initialState: firstState,
-          alphabet: [element.symbol],
-          transitions: {
-            firstState: {
-              element.symbol: [lastState]
-            },
-            lastState: {}
-          },
-          finalStates: [lastState],
-        );
-
-        eNFAs.add(eNFA);
-      }
-    }
+    List<EpsilonNFA> eNFAs = _generateNFAsFromSymbol(symbols, []);
 
     for (var e in eNFAs) {
       print(e.transitions);
     }
+  }
+
+  static List<EpsilonNFA> _generateNFAsFromSymbol(
+    List<Symbol> symbols,
+    List<EpsilonNFA> eNFAs, [
+    int stateCounter = 0,
+  ]) {
+    if (symbols.isEmpty) return eNFAs;
+
+    final element = symbols.removeAt(0);
+
+    if (element is Literal) {
+      final firstState = 'q$stateCounter';
+      final lastState = 'q${stateCounter + 1}';
+
+      stateCounter += 2;
+
+      final eNFA = EpsilonNFA(
+        states: [firstState, lastState],
+        initialState: firstState,
+        alphabet: [element.symbol],
+        transitions: {
+          firstState: {
+            element.symbol: [lastState]
+          },
+          lastState: {}
+        },
+        finalStates: [lastState],
+      );
+
+      eNFAs.add(eNFA);
+      return _generateNFAsFromSymbol(symbols, eNFAs, stateCounter);
+    }
+
+    final firstState = 'q$stateCounter';
+    final lastState = 'q${stateCounter + 1}';
+
+    stateCounter += 2;
+
+    final eNFA = EpsilonNFA(
+      states: [firstState, lastState],
+      initialState: firstState,
+      alphabet: [],
+      transitions: {
+        firstState: {
+          epsilon: [lastState]
+        },
+        lastState: {}
+      },
+      finalStates: [lastState],
+    );
+
+    eNFAs.add(eNFA);
+    return _generateNFAsFromSymbol(symbols, eNFAs, stateCounter);
   }
 
   static List<Symbol> _parseRegularExpression(String regularExpression, List<Symbol> symbols) {
