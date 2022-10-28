@@ -1,3 +1,9 @@
+abstract class RegularExpressionScanner {
+  const RegularExpressionScanner();
+
+  List<Symbol> parse();
+}
+
 abstract class Symbol {}
 
 class Epsilon implements Symbol {
