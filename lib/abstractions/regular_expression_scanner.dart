@@ -15,20 +15,20 @@ class Epsilon implements Symbol {
   String toString() => '$runtimeType => $symbol';
 }
 
-class ConcatenationSymbol implements Symbol {
+class Or implements Symbol {
   final String symbol = '+';
 
-  const ConcatenationSymbol();
+  const Or();
 
   @override
   String toString() => '$runtimeType => $symbol';
 }
 
-class Concatenation implements Symbol {
+class Union implements Symbol {
   final List<Symbol> left;
   final List<Symbol> right;
 
-  const Concatenation({required this.left, required this.right});
+  const Union({required this.left, required this.right});
 
   @override
   String toString() => '$runtimeType => $left || $right';

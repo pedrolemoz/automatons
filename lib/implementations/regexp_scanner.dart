@@ -7,9 +7,12 @@ class RegExpScanner implements RegularExpressionScanner {
   const RegExpScanner(this.regularExpression);
 
   @override
-  List<Symbol> parse() => _parseRegularExpression(regularExpression, []);
+  List<Symbol> parse() => _parseRegularExpression("($regularExpression)", []);
 
-  List<Symbol> _parseRegularExpression(String regularExpression, List<Symbol> symbols) {
+  List<Symbol> _parseRegularExpression(
+    String regularExpression,
+    List<Symbol> symbols,
+  ) {
     if (regularExpression.isEmpty) return symbols;
 
     final symbol = regularExpression[0];
@@ -25,34 +28,46 @@ class RegExpScanner implements RegularExpressionScanner {
 
       final closeParenthesisIndexes = regularExpression.allIndexesOf(')');
       final closeParenthesisIndex = closeParenthesisIndexes[offset];
-      final selectionSymbols = _parseRegularExpression(regularExpression.substring(1, closeParenthesisIndex), []);
+      final selectionSymbols = _parseRegularExpression(
+        regularExpression.substring(1, closeParenthesisIndex),
+        [],
+      );
       List<Symbol> left = [];
       List<Symbol> right = [];
 
-      if (selectionSymbols.any((symbol) => symbol is ConcatenationSymbol)) {
-        final selectionSymbolIndex = selectionSymbols.indexWhere((symbol) => symbol is ConcatenationSymbol);
+      if (selectionSymbols.any((symbol) => symbol is Or)) {
+        final selectionSymbolIndex =
+            selectionSymbols.indexWhere((symbol) => symbol is Or);
         left = selectionSymbols.sublist(0, selectionSymbolIndex);
-        right = selectionSymbols.sublist(selectionSymbolIndex + 1, selectionSymbols.length);
+        right = selectionSymbols.sublist(
+            selectionSymbolIndex + 1, selectionSymbols.length);
       }
 
-      final hasConcatenation = left.isNotEmpty && right.isNotEmpty;
+      final hasUnion = left.isNotEmpty && right.isNotEmpty;
 
-      if (regularExpression.length > closeParenthesisIndex + 1 && regularExpression[closeParenthesisIndex + 1] == '*') {
-        if (hasConcatenation) {
-          symbols.add(KleenClosure([Concatenation(left: left, right: right)]));
+      if (regularExpression.length > closeParenthesisIndex + 1 &&
+          regularExpression[closeParenthesisIndex + 1] == '*') {
+        if (hasUnion) {
+          symbols.add(KleenClosure([Union(left: left, right: right)]));
         } else {
           symbols.add(KleenClosure(selectionSymbols));
         }
 
-        return _parseRegularExpression(regularExpression.substring(closeParenthesisIndex + 2), symbols);
+        return _parseRegularExpression(
+          regularExpression.substring(closeParenthesisIndex + 2),
+          symbols,
+        );
       } else {
-        if (hasConcatenation) {
-          symbols.add(Selection([Concatenation(left: left, right: right)]));
+        if (hasUnion) {
+          symbols.add(Selection([Union(left: left, right: right)]));
         } else {
           symbols.add(Selection(selectionSymbols));
         }
 
-        return _parseRegularExpression(regularExpression.substring(closeParenthesisIndex + 1), symbols);
+        return _parseRegularExpression(
+          regularExpression.substring(closeParenthesisIndex + 1),
+          symbols,
+        );
       }
     }
 
@@ -62,7 +77,7 @@ class RegExpScanner implements RegularExpressionScanner {
     }
 
     if (symbol == '+') {
-      symbols.add(const ConcatenationSymbol());
+      symbols.add(const Or());
       return _parseRegularExpression(regularExpression.substring(1), symbols);
     }
 

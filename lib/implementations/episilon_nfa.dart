@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../abstractions/constants.dart';
 import '../abstractions/epsilon_non_deterministic_automaton.dart';
 import '../abstractions/regular_expression_scanner.dart';
@@ -12,14 +14,18 @@ class EpsilonNFA extends EpsilonNonDeterministicAutomaton {
     required super.finalStates,
   });
 
-  static thompsonConstruction(String regularExpression) {
+  static dynamic thompsonConstruction(String regularExpression) {
     final regexScanner = RegExpScanner(regularExpression);
     final symbols = regexScanner.parse();
     List<EpsilonNFA> eNFAs = _generateNFAsFromSymbol(symbols, []);
-
-    for (var e in eNFAs) {
-      print(e.transitions);
-    }
+    JsonEncoder encoder = new JsonEncoder.withIndent('  ');
+    return eNFAs;
+    // for (var e in eNFAs) {
+    //   print('Initial state ${e.initialState}\n');
+    //   print('Final states ${e.finalStates}\n');
+    //   print(encoder.convert(e.transitions));
+    //   print(e.evaluate('ab'));
+    // }
   }
 
   static List<EpsilonNFA> _generateNFAsFromSymbol(
@@ -50,7 +56,61 @@ class EpsilonNFA extends EpsilonNonDeterministicAutomaton {
         finalStates: [lastState],
       );
 
-      eNFAs.add(eNFA);
+      if (eNFAs.isNotEmpty) {
+        final lastNFA = eNFAs.removeLast();
+
+        eNFAs.add(_eNFAConcatenation(eNFA, lastNFA));
+      } else {
+        eNFAs.add(eNFA);
+      }
+
+      return _generateNFAsFromSymbol(symbols, eNFAs, stateCounter);
+    }
+
+    // if (element is Union) {
+    //   if (eNFAs.isNotEmpty) {
+    //     final firstUnionState = 'q$stateCounter';
+    //     final lastUnionState = 'q${stateCounter + 1}';
+
+    //     final lastNFA = eNFAs.removeLast();
+
+    //     eNFAs.add(
+    //       EpsilonNFA(
+    //         states: [...eNFA.states, ...lastNFA.states, firstUnionState, lastUnionState],
+    //         alphabet: [...eNFA.alphabet, ...lastNFA.alphabet],
+    //         transitions: {
+    //           firstUnionState: {
+    //             epsilon: [
+    //               eNFA.initialState,
+    //               lastNFA.initialState,
+    //             ],
+    //           },
+    //           ...eNFA.transitions,
+    //           ...lastNFA.transitions,
+    //           for (var state in eNFA.finalStates) ...{
+    //             state: {
+    //               epsilon: [lastUnionState]
+    //             },
+    //           },
+    //           for (var state in lastNFA.finalStates) ...{
+    //             state: {
+    //               epsilon: [lastUnionState]
+    //             },
+    //           },
+    //           lastUnionState: {}
+    //         },
+    //         initialState: firstUnionState,
+    //         finalStates: [lastUnionState],
+    //       ),
+    //     );
+    //   }
+    // }
+
+    if (element is Selection) {
+      final eNFAsSelection =
+          _generateNFAsFromSymbol(element.symbols, [], stateCounter);
+
+      eNFAs.addAll(eNFAsSelection);
       return _generateNFAsFromSymbol(symbols, eNFAs, stateCounter);
     }
 
@@ -72,15 +132,45 @@ class EpsilonNFA extends EpsilonNonDeterministicAutomaton {
       finalStates: [lastState],
     );
 
-    eNFAs.add(eNFA);
+    if (eNFAs.isNotEmpty) {
+      final lastNFA = eNFAs.removeLast();
+
+      eNFAs.add(_eNFAConcatenation(eNFA, lastNFA));
+    } else {
+      eNFAs.add(eNFA);
+    }
+
     return _generateNFAsFromSymbol(symbols, eNFAs, stateCounter);
+  }
+
+  static EpsilonNFA _eNFAConcatenation(
+      EpsilonNFA currentNFA, EpsilonNFA lastNFA) {
+    for (var state in lastNFA.finalStates) {
+      if (lastNFA.transitions[state]?[epsilon] != null) {
+        lastNFA.transitions[state]![epsilon]!.add(currentNFA.initialState);
+      } else {
+        lastNFA.transitions[state]?.addAll({
+          epsilon: [currentNFA.initialState]
+        });
+      }
+    }
+
+    return EpsilonNFA(
+      states: [...lastNFA.states, ...currentNFA.states],
+      alphabet: [...lastNFA.alphabet, ...currentNFA.alphabet],
+      transitions: {...lastNFA.transitions, ...currentNFA.transitions},
+      initialState: lastNFA.initialState,
+      finalStates: [...currentNFA.finalStates],
+    );
   }
 
   @override
   bool evaluate(String input) {
     if (!hasValidInput(input)) return false;
     final eClosure = epsilonClosure(initialState);
-    final states = eClosure.map((cState) => extendedTransition(cState, input)).reduce((a, b) => a += b);
+    final states = eClosure
+        .map((cState) => extendedTransition(cState, input))
+        .reduce((a, b) => a += b);
     return states.any((state) => finalStates.contains(state));
   }
 
@@ -100,6 +190,9 @@ class EpsilonNFA extends EpsilonNonDeterministicAutomaton {
   List<String> epsilonClosure(String state) {
     if (!transitions[state]!.containsKey(epsilon)) return [state];
     final possibleNextStates = transitions[state]![epsilon]!;
-    return [state] + possibleNextStates.map((nextState) => epsilonClosure(nextState)).reduce((a, b) => a += b);
+    return [state] +
+        possibleNextStates
+            .map((nextState) => epsilonClosure(nextState))
+            .reduce((a, b) => a += b);
   }
 }
